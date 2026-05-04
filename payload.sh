@@ -49,6 +49,9 @@ check_adapter() {
 }
 
 bring_up_monitor() {
+    # Stop any existing hopper first
+    stop_hopper
+
     # Remove existing if present
     ip link set "$MON_IFACE" down 2>/dev/null
     iw dev "$MON_IFACE" del 2>/dev/null
@@ -112,53 +115,36 @@ fi
 LOG green "AWUS036ACM detected (MT7612U)"
 LOG ""
 
-# Check if already running
-if [ -f "$HOP_PID_FILE" ] && kill -0 "$(cat "$HOP_PID_FILE")" 2>/dev/null; then
-    LOG yellow "Channel hopper already running (PID $(cat $HOP_PID_FILE))"
-    LOG yellow "Current interface: $MON_IFACE"
-    LOG ""
-fi
-
 # ---- MODE SELECTION ----
 
-LOG cyan "Select adapter mode:"
-LOG ""
-
-MODE=$(LIST_PICKER "Wardrive Hop 1/6/11" "Wardrive Full Hop 1-13" "Wardrive 5GHz" "Passive ch6 (StamenScan)" "Disable / Cleanup")
+MODE=$(LIST_PICKER "Select Mode" "Hop 1/6/11" "5GHz Full" "Passive ch6" "Disable/Cleanup" "Exit")
 
 case $? in "$DUCKYSCRIPT_CANCELLED"|"$DUCKYSCRIPT_REJECTED"|"$DUCKYSCRIPT_ERROR")
     LOG red "Cancelled"; exit 0 ;; esac
 
 case "$MODE" in
-    "Wardrive Hop 1/6/11")
+    "Hop 1/6/11")
         LOG cyan "Mode: Wardrive Hop 1/6/11"
         DWELL=350
         CHANNELS="$CHANNELS_FLOCK"
         ;;
-    "Wardrive Full Hop 1-13")
-        LOG cyan "Mode: Wardrive Full Hop 1-13"
-        DWELL=500
-        CHANNELS="$CHANNELS_FULL_24"
-        ;;
-    "Wardrive 5GHz")
+    "5GHz Full")
         LOG cyan "Mode: Wardrive 5GHz"
         DWELL=400
         CHANNELS="$CHANNELS_5GHZ"
         ;;
-    "Passive ch6 (StamenScan)")
+    "Passive ch6")
         LOG cyan "Mode: Passive ch6"
         DWELL=0
         CHANNELS="6"
         ;;
-    "Disable / Cleanup")
+    "Disable/Cleanup")
         cleanup_adapter
         LED SETUP
         exit 0
         ;;
     *)
-        LOG "Exiting."
-        exit 0
-        ;;
+        LOG "Exiting."; exit 0 ;;
 esac
 
 # ---- SETUP ----
@@ -174,7 +160,7 @@ fi
 
 LOG green "$MON_IFACE ready"
 
-if [ "$MODE" -eq 4 ]; then
+if [ "$MODE" = "Passive ch6" ]; then
     # Fixed channel — no hopper
     iw dev "$MON_IFACE" set channel 6 2>/dev/null
     LOG green "Fixed channel 6 — ready for StamenScan"
@@ -196,7 +182,7 @@ done
 
 LOG ""
 LOG cyan "Run your payload — adapter will stay active."
-LOG cyan "Run this payload again → option 5 to disable."
+LOG cyan "Run this payload again → option 4 to disable."
 LOG ""
 
 LED FINISH
